@@ -59,7 +59,8 @@
       loop();
     });
 
-    const SPRITE_WIDTH = 64;
+    // TAMANHO CORRETO DA NOVA IMAGEM: cada quadro tem 96x96
+    const SPRITE_WIDTH = 96;
     const SPRITE_HEIGHT = 96;
     const TOTAL_FRAMES = 4;
 
@@ -106,6 +107,7 @@
         player.grounded = true;
       }
 
+      // Atualiza quadro da animação
       if (player.grounded) {
         player.frameTimer++;
         if (player.frameTimer >= player.frameDelay) {
@@ -135,6 +137,7 @@
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Desenha o frame atual da imagem (frame * largura do quadro)
       ctx.drawImage(
         player.sprite,
         player.frame * player.width, 0,
@@ -143,11 +146,13 @@
         player.width, player.height
       );
 
+      // Obstáculos
       ctx.fillStyle = "brown";
       obstacles.forEach(ob => {
         ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
       });
 
+      // Pontuação
       ctx.fillStyle = "black";
       ctx.font = "20px Arial";
       ctx.fillText("Pontuação: " + score, 10, 30);
