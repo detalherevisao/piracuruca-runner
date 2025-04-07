@@ -1,206 +1,230 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Piracuruca Runner</title>
+  <title>Corre, Chico!</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
+      background: #87CEEB; /* Céu azul claro */
       font-family: sans-serif;
+      user-select: none;
     }
-    #startScreen, #gameOverScreen {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(#87ceeb, #4caf50);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10;
+
+    #gameCanvas {
+      display: block;
+      background: linear-gradient(#87CEEB, #ffffff);
     }
+
     #startButton, #restartButton {
-      font-size: 24px;
-      padding: 15px 30px;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #222;
+      color: white;
       border: none;
       border-radius: 10px;
-      background-color: #2196f3;
-      color: white;
       cursor: pointer;
-      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+      z-index: 10;
     }
-    canvas {
-      display: block;
-      background-color: #87CEEB;
+
+    #startButton { top: 40%; }
+    #restartButton { top: 60%; display: none; }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      color: white;
+      text-shadow: 1px 1px 2px black;
+      z-index: 10;
     }
   </style>
 </head>
 <body>
-  <div id="startScreen">
-    <h1>Piracuruca Runner</h1>
-    <button id="startButton">Começar</button>
-  </div>
-
-  <div id="gameOverScreen" style="display: none;">
-    <h1>Game Over!</h1>
-    <button id="restartButton">Recomeçar</button>
-  </div>
-
-  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <canvas id="gameCanvas" width="480" height="720"></canvas>
+  <div id="score">Pontos: 0</div>
+  <button id="startButton">CHICÃO ESTÁ PRONTO</button>
+  <button id="restartButton">RECOMEÇAR</button>
 
   <script>
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
 
-    let started = false;
-    let gameOver = false;
-    let speed = 3;
+    const startButton = document.getElementById('startButton');
+    const restartButton = document.getElementById('restartButton');
+    const scoreDisplay = document.getElementById('score');
 
-    const startScreen = document.getElementById("startScreen");
-    const gameOverScreen = document.getElementById("gameOverScreen");
-    const startButton = document.getElementById("startButton");
-    const restartButton = document.getElementById("restartButton");
+    const playerImg = new Image();
+    playerImg.src = 'runner.png';
 
-    startButton.onclick = () => {
-      startScreen.style.display = "none";
-      started = true;
-      loop();
-    };
+    const dogImg = new Image();
+    dogImg.src = 'dog_obstacle.png';
 
-    restartButton.onclick = () => {
-      location.reload();
-    };
+    const bottleImg = new Image();
+    bottleImg.src = 'energy_bottle.png';
 
-    let player = {
-      x: 50,
-      y: 300,
-      width: 64,
-      height: 64,
-      velocityY: 0,
-      jumpForce: 12,
-      gravity: 0.6,
-      grounded: true,
-      sprite: new Image(),
-    };
-    player.sprite.src = "runner.png";
-
+    let gameRunning = false;
+    let player = { x: 50, y: 600, width: 50, height: 50, vy: 0, grounded: true };
     let obstacles = [];
-    let energies = [];
+    let bottles = [];
     let score = 0;
-    let energyMultiplier = 1;
+    let doublePoints = false;
+    let doublePointsTimer = 0;
+    let speed = 3;
+    let frame = 0;
 
-    function createObstacle() {
-      const height = 40 + Math.random() * 40;
-      obstacles.push({
-        x: canvas.width,
-        y: canvas.height - height,
-        width: 30,
-        height: height,
-      });
+    function startGame() {
+      gameRunning = true;
+      player.y = 600;
+      obstacles = [];
+      bottles = [];
+      score = 0;
+      speed = 3;
+      frame = 0;
+      doublePoints = false;
+      doublePointsTimer = 0;
+      startButton.style.display = 'none';
+      restartButton.style.display = 'none';
+      loop();
     }
 
-    function createEnergy() {
-      energies.push({
-        x: canvas.width + Math.random() * 300,
-        y: 280,
-        width: 20,
-        height: 30,
-        collected: false,
-      });
+    function gameOver() {
+      gameRunning = false;
+      restartButton.style.display = 'block';
+    }
+
+    function drawBackground() {
+      // Céu
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Chão
+      ctx.fillStyle = '#228B22';
+      ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+
+      // Faixa de estrada
+      ctx.fillStyle = '#444';
+      ctx.fillRect(0, canvas.height - 120, canvas.width, 20);
+
+      // Detalhes da estrada
+      ctx.strokeStyle = '#fff';
+      for (let i = 0; i < canvas.width; i += 40) {
+        ctx.beginPath();
+        ctx.moveTo(i, canvas.height - 110);
+        ctx.lineTo(i + 20, canvas.height - 110);
+        ctx.stroke();
+      }
+    }
+
+    function drawPlayer() {
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+    }
+
+    function drawObstacles() {
+      for (let obs of obstacles) {
+        ctx.drawImage(dogImg, obs.x, obs.y, obs.width, obs.height);
+      }
+    }
+
+    function drawBottles() {
+      for (let b of bottles) {
+        ctx.drawImage(bottleImg, b.x, b.y, b.width, b.height);
+      }
     }
 
     function update() {
-      if (!started || gameOver) return;
+      // Gravidade e salto
+      player.vy += 1.5;
+      player.y += player.vy;
 
-      player.velocityY += player.gravity;
-      player.y += player.velocityY;
-
-      if (player.y >= 300) {
-        player.y = 300;
-        player.velocityY = 0;
+      if (player.y > 600) {
+        player.y = 600;
+        player.vy = 0;
         player.grounded = true;
       }
 
-      obstacles.forEach(ob => ob.x -= speed);
-      energies.forEach(e => e.x -= speed);
-
-      if (obstacles.length === 0 || obstacles[obstacles.length - 1].x < 400) {
-        createObstacle();
-        if (Math.random() < 0.5) createEnergy();
+      // Obstáculos
+      if (frame % 100 === 0) {
+        obstacles.push({ x: canvas.width, y: 600, width: 50, height: 50 });
+      }
+      for (let obs of obstacles) {
+        obs.x -= speed;
+        if (isColliding(player, obs)) gameOver();
       }
 
-      obstacles = obstacles.filter(ob => ob.x + ob.width > 0);
-      energies = energies.filter(e => e.x + e.width > 0);
-
-      obstacles.forEach(ob => {
-        if (
-          player.x < ob.x + ob.width &&
-          player.x + player.width > ob.x &&
-          player.y + player.height > ob.y
-        ) {
-          gameOver = true;
-          gameOverScreen.style.display = "flex";
+      // Itens
+      if (frame % 250 === 0) {
+        bottles.push({ x: canvas.width, y: 550, width: 30, height: 30 });
+      }
+      for (let b of bottles) {
+        b.x -= speed;
+        if (isColliding(player, b)) {
+          doublePoints = true;
+          doublePointsTimer = 300;
+          b.x = -100; // remove da tela
         }
-      });
+      }
 
-      energies.forEach(e => {
-        if (!e.collected &&
-            player.x < e.x + e.width &&
-            player.x + player.width > e.x &&
-            player.y + player.height > e.y) {
-          e.collected = true;
-          energyMultiplier = 2;
-          setTimeout(() => energyMultiplier = 1, 5000); // dobra os pontos por 5 segundos
-        }
-      });
+      // Atualizar pontuação
+      if (frame % 10 === 0) {
+        score += doublePoints ? 2 : 1;
+        scoreDisplay.textContent = `Pontos: ${score}`;
+      }
 
-      score += energyMultiplier;
-      speed += 0.001; // aumenta a velocidade com o tempo
+      // Duração do dobro de pontos
+      if (doublePointsTimer > 0) {
+        doublePointsTimer--;
+      } else {
+        doublePoints = false;
+      }
+
+      // Aumentar dificuldade
+      if (frame % 300 === 0) speed += 0.2;
+
+      frame++;
     }
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.drawImage(player.sprite, player.x, player.y, player.width, player.height);
-
-      ctx.fillStyle = "brown";
-      obstacles.forEach(ob => {
-        ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
-      });
-
-      energies.forEach(e => {
-        if (!e.collected) {
-          ctx.fillStyle = "cyan";
-          ctx.fillRect(e.x, e.y, e.width, e.height);
-          ctx.strokeStyle = "blue";
-          ctx.strokeRect(e.x, e.y, e.width, e.height);
-        }
-      });
-
-      ctx.fillStyle = "black";
-      ctx.font = "20px Arial";
-      ctx.fillText("Pontuação: " + score, 10, 30);
+    function isColliding(a, b) {
+      return a.x < b.x + b.width && a.x + a.width > b.x &&
+             a.y < b.y + b.height && a.y + a.height > b.y;
     }
 
     function loop() {
+      if (!gameRunning) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
       update();
-      draw();
-      if (!gameOver) requestAnimationFrame(loop);
+      drawPlayer();
+      drawObstacles();
+      drawBottles();
+
+      requestAnimationFrame(loop);
     }
 
-    function jump() {
-      if (player.grounded && started && !gameOver) {
-        player.velocityY = -player.jumpForce;
+    // Controles
+    window.addEventListener('keydown', e => {
+      if ((e.key === ' ' || e.key === 'ArrowUp') && player.grounded) {
+        player.vy = -25;
         player.grounded = false;
       }
-    }
-
-    window.addEventListener("keydown", e => {
-      if (e.code === "Space") jump();
     });
-    window.addEventListener("touchstart", jump);
+
+    canvas.addEventListener('touchstart', () => {
+      if (player.grounded) {
+        player.vy = -25;
+        player.grounded = false;
+      }
+    });
+
+    startButton.onclick = startGame;
+    restartButton.onclick = startGame;
   </script>
 </body>
 </html>
